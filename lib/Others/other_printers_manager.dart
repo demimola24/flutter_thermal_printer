@@ -92,7 +92,7 @@ class OtherPrinterManager {
   }
 
   // Print data to BLE device
-  Future<void> printData(
+  Future<bool> printData(
     Printer printer,
     List<int> bytes, {
     bool longData = false,
@@ -104,15 +104,17 @@ class OtherPrinterManager {
           Uint8List.fromList(bytes),
           path: printer.address,
         );
+        return true;
       } catch (e) {
         log("FlutterThermalPrinter: Unable to Print Data $e");
+        return false;
       }
     } else {
       try {
         final device = BluetoothDevice.fromId(printer.address!);
         if (!device.isConnected) {
           log('Device is not connected');
-          return;
+          return false;
         }
 
         final services =
@@ -130,7 +132,7 @@ class OtherPrinterManager {
 
         if (writeCharacteristic == null) {
           log('No write characteristic found');
-          return;
+          return false;
         }
 
         const maxChunkSize = 512;
@@ -146,9 +148,10 @@ class OtherPrinterManager {
           );
         }
 
-        return;
+        return true;
       } catch (e) {
         log('Failed to print data to device $e');
+        return false;
       }
     }
   }
