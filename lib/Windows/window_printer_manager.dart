@@ -182,7 +182,7 @@ class WindowPrinterManager {
         _devicesstream.add((await PrintUsb.getList()).map((device) => Printer(name: device.name, address: device.model, connectionType: ConnectionType.USB, isConnected: device.available, vendorId: "", productId: "")).toList());
       }
     }else{
-
+      _devicesstream.add([]);
     }
   }
 
