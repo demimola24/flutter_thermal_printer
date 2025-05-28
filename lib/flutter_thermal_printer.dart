@@ -55,19 +55,14 @@ class FlutterThermalPrinter {
   Future<bool> printData(
     Printer device,
     List<int> bytes, {
-    bool longData = true,bool useAlternate = false,
+    bool longData = true, WindowsLib version = WindowsLib.V1
   }) async {
     if (Platform.isWindows) {
-      if(useAlternate){
-        return await WindowPrinterManager.instance.printUSBData(
-          device,
-          bytes
-        );
-      }
       return await WindowPrinterManager.instance.printData(
         device,
         bytes,
         longData: longData,
+        version: version
       );
     } else {
       return await OtherPrinterManager.instance.printData(
@@ -85,11 +80,13 @@ class FlutterThermalPrinter {
       ConnectionType.BLE
     ],
     bool androidUsesFineLocation = false,
+    WindowsLib version = WindowsLib.V1
   }) async {
     if (Platform.isWindows) {
       WindowPrinterManager.instance.getPrinters(
         refreshDuration: refreshDuration,
         connectionTypes: connectionTypes,
+        version: version
       );
     } else {
       OtherPrinterManager.instance.getPrinters(

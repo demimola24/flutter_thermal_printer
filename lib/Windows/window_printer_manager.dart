@@ -60,25 +60,24 @@ class WindowPrinterManager {
     return await WinBle.isPaired(device.address!);
   }
 
-  Future<bool> printUSBData(
-      Printer device,
-      List<int> bytes) async{
-
-    return await PrintUsb.printBytes(bytes: bytes, device: UsbDevice(name: device.name??"", model: device.address??"",isDefault: false, available: true));
-  }
-
   // Print data to a BLE device
   Future<bool> printData(
     Printer device,
     List<int> bytes, {
     bool longData = false,
+    WindowsLib version = WindowsLib.V1
   }) async {
+    try{
     if (device.connectionType == ConnectionType.USB) {
-      using((Arena alloc) {
-        final printer = RawPrinter(device.name!, alloc);
-        printer.printEscPosWin32(bytes);
-      });
-      return true;
+      if(version == WindowsLib.V1){
+        using((Arena alloc) {
+          final printer = RawPrinter(device.name!, alloc);
+          printer.printEscPosWin32(bytes);
+        });
+        return true;
+      }else{
+        return await PrintUsb.printBytes(bytes: bytes, device: UsbDevice(name: device.name??"", model: device.address??"",isDefault: false, available: true));
+      }
     }
     if (!isInitialized) {
       throw Exception('WindowBluetoothManager is not initialized');
@@ -91,7 +90,7 @@ class WindowPrinterManager {
     );
     final characteristic = characteristics.firstWhere((element) => element.properties.write ?? false).uuid;
     final mtusize = await WinBle.getMaxMtuSize(device.address!);
-   try{
+
      if (longData) {
        int mtu = mtusize - 50;
        if (mtu.isNegative) {
@@ -139,6 +138,7 @@ class WindowPrinterManager {
       ConnectionType.BLE,
       ConnectionType.USB,
     ],
+    WindowsLib version = WindowsLib.V1
   }) async {
     List<Printer> btlist = [];
     if (connectionTypes.contains(ConnectionType.BLE)) {
@@ -165,23 +165,27 @@ class WindowPrinterManager {
     }
     List<Printer> list = [];
     if (connectionTypes.contains(ConnectionType.USB)) {
-      _usbSubscription?.cancel();
-      _usbSubscription = Stream.periodic(refreshDuration, (x) => x).listen((event) async {
-        final devices = PrinterNames(PRINTER_ENUM_LOCAL);
-        List<Printer> templist = [];
-        for (var e in devices.all()) {
-          final device = Printer(
-            vendorId: e,
-            productId: "N/A",
-            name: e,
-            connectionType: ConnectionType.USB,
-            address: e,
-            isConnected: true,
-          );
-          templist.add(device);
-        }
-        list = templist;
-      });
+      if(version == WindowsLib.V1){
+        _usbSubscription?.cancel();
+        _usbSubscription = Stream.periodic(refreshDuration, (x) => x).listen((event) async {
+          final devices = PrinterNames(PRINTER_ENUM_LOCAL);
+          List<Printer> templist = [];
+          for (var e in devices.all()) {
+            final device = Printer(
+              vendorId: e,
+              productId: "N/A",
+              name: e,
+              connectionType: ConnectionType.USB,
+              address: e,
+              isConnected: true,
+            );
+            templist.add(device);
+          }
+          list = templist;
+        });
+      }else{
+        list.addAll((await PrintUsb.getList()).map((device) => Printer(name: device.name, address: device.model, connectionType: ConnectionType.USB, isConnected: device.available, vendorId: "", productId: "")));
+      }
     }
     Stream.periodic(refreshDuration, (x) => x).listen((event) {
       _devicesstream.add(list + btlist);
