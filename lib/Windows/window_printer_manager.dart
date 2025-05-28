@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
 import 'package:print_usb/model/usb_device.dart';
 import 'package:print_usb/print_usb.dart';
@@ -25,9 +26,14 @@ class WindowPrinterManager {
 
   static init() async {
     if (!isInitialized) {
-      WinBle.initialize(serverPath: await WinServer.path()).then((value) {
-        isInitialized = true;
-      });
+        WinBle.initialize(serverPath: await WinServer.path()).then((value) {
+          isInitialized = true;
+        }, onError: (e){
+          if(e.toString().contains("already initialized")){
+            isInitialized = true;
+          }
+          debugPrint(e.toString());
+        });
     }
   }
 
@@ -37,14 +43,10 @@ class WindowPrinterManager {
 
   // Stop scanning for BLE devices
   Future<void> stopscan() async {
-    if (!isInitialized) {
-      throw Exception('WindowBluetoothManager is not initialized');
+    if (isInitialized) {
+      WinBle.stopScanning();
     }
-    WinBle.stopScanning();
-    subscription?.cancel();
   }
-
-  StreamSubscription? subscription;
 
   // Connect to a BLE device
   Future<bool> connect(Printer device) async {
@@ -128,7 +130,13 @@ class WindowPrinterManager {
    }
   }
 
-  StreamSubscription? _usbSubscription;
+  Future<bool> isPaired(String address) async{
+    try{
+      return await WinBle.isPaired(address);
+    }catch(e){
+      return false;
+    }
+  }
 
   // Getprinters
   void getPrinters({
@@ -152,16 +160,22 @@ class WindowPrinterManager {
       List<Printer> btlist = [];
       WinBle.stopScanning();
       WinBle.startScanning();
-      subscription?.cancel();
-      subscription = WinBle.scanStream.listen((device) async {
-        btlist.add(Printer(
-          address: device.address,
-          name: device.name,
-          connectionType: ConnectionType.BLE,
-          isConnected: await WinBle.isPaired(device.address),
-        ));
+       WinBle.scanStream.map((item) async => Printer(
+         address: item.address,
+         name: item.name,
+         connectionType: ConnectionType.BLE,
+         isConnected: await isPaired(item.address),
+       )).listen((value) async {
+         final device  = await value;
+       final index = btlist.indexWhere((element) => element.name == device.name);
+       if (index != -1) {
+         btlist[index] = device;
+       } else {
+         btlist.add(device);
+       }
+       _devicesstream.add(btlist);
       });
-      _devicesstream.add(btlist);
+
     } else if (connectionTypes.contains(ConnectionType.USB)) {
       if(version == WindowsLib.V1){
           final devices = PrinterNames(PRINTER_ENUM_LOCAL);
@@ -204,5 +218,11 @@ class WindowPrinterManager {
       throw Exception('WindowBluetoothManager is not initialized');
     }
     return (await WinBle.getBluetoothState()) == BleState.On;
+  }
+
+  void dispose(){
+    if(isInitialized){
+      WinBle.dispose();
+    }
   }
 }

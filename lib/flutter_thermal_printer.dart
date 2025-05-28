@@ -331,4 +331,10 @@ class FlutterThermalPrinter {
       }
     }
   }
+
+  void dispose(){
+    if (Platform.isWindows) {
+      WindowPrinterManager.instance.dispose();
+    }
+  }
 }
