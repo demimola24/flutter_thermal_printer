@@ -87,3 +87,8 @@ extension PrinterExtension on Printer {
     return BluetoothDevice.fromId(address!).connectionState;
   }
 }
+
+enum WindowsLib {
+  V1,
+  V2,
+}
