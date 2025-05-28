@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:typed_data';
-
 import 'package:ffi/ffi.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
 import 'package:print_usb/model/usb_device.dart';
@@ -133,14 +132,13 @@ class WindowPrinterManager {
 
   // Getprinters
   void getPrinters({
-    Duration refreshDuration = const Duration(seconds: 5),
+    Duration refreshDuration = const Duration(seconds: 10),
     List<ConnectionType> connectionTypes = const [
       ConnectionType.BLE,
       ConnectionType.USB,
     ],
     WindowsLib version = WindowsLib.V1
   }) async {
-    List<Printer> btlist = [];
     if (connectionTypes.contains(ConnectionType.BLE)) {
       await init();
       if (!isInitialized) {
@@ -151,6 +149,7 @@ class WindowPrinterManager {
           'WindowBluetoothManager is not initialized. Try starting the scan again',
         );
       }
+      List<Printer> btlist = [];
       WinBle.stopScanning();
       WinBle.startScanning();
       subscription?.cancel();
@@ -162,12 +161,9 @@ class WindowPrinterManager {
           isConnected: await WinBle.isPaired(device.address),
         ));
       });
-    }
-    List<Printer> list = [];
-    if (connectionTypes.contains(ConnectionType.USB)) {
+      _devicesstream.add(btlist);
+    } else if (connectionTypes.contains(ConnectionType.USB)) {
       if(version == WindowsLib.V1){
-        _usbSubscription?.cancel();
-        _usbSubscription = Stream.periodic(refreshDuration, (x) => x).listen((event) async {
           final devices = PrinterNames(PRINTER_ENUM_LOCAL);
           List<Printer> templist = [];
           for (var e in devices.all()) {
@@ -181,15 +177,13 @@ class WindowPrinterManager {
             );
             templist.add(device);
           }
-          list = templist;
-        });
+          _devicesstream.add(templist);
       }else{
-        list.addAll((await PrintUsb.getList()).map((device) => Printer(name: device.name, address: device.model, connectionType: ConnectionType.USB, isConnected: device.available, vendorId: "", productId: "")));
+        _devicesstream.add((await PrintUsb.getList()).map((device) => Printer(name: device.name, address: device.model, connectionType: ConnectionType.USB, isConnected: device.available, vendorId: "", productId: "")).toList());
       }
+    }else{
+
     }
-    Stream.periodic(refreshDuration, (x) => x).listen((event) {
-      _devicesstream.add(list + btlist);
-    });
   }
 
   turnOnBluetooth() async {
