@@ -27,17 +27,13 @@ class _MyAppState extends State<MyApp> {
 
   List<Printer> printers = [];
 
-  StreamSubscription<List<Printer>>? _devicesStreamSubscription;
-
   // Get Printer List
   void startScan() async {
-    _devicesStreamSubscription?.cancel();
     await _flutterThermalPrinterPlugin.getPrinters(connectionTypes: [
-      ConnectionType.USB,
       ConnectionType.BLE,
     ]);
-    _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream.listen((List<Printer> event) {
-      log(event.map((e) => e.name).toList().toString());
+  _flutterThermalPrinterPlugin.devicesStream.listen((List<Printer> event) {
+
       setState(() {
         printers = event;
         printers.removeWhere((element) => element.name == null || element.name == '');
