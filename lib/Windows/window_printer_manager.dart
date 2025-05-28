@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
+import 'package:print_usb/model/usb_device.dart';
+import 'package:print_usb/print_usb.dart';
 import 'package:win32/win32.dart';
 import 'package:win_ble/win_ble.dart';
 import 'package:win_ble/win_file.dart';
@@ -47,6 +49,9 @@ class WindowPrinterManager {
 
   // Connect to a BLE device
   Future<bool> connect(Printer device) async {
+    if(device.connectionType==ConnectionType.USB){
+     return await PrintUsb.connect(name: device.name??"");
+    }
     if (!isInitialized) {
       throw Exception('WindowBluetoothManager is not initialized');
     }
@@ -55,8 +60,15 @@ class WindowPrinterManager {
     return await WinBle.isPaired(device.address!);
   }
 
+  Future<bool> printUSBData(
+      Printer device,
+      List<int> bytes) async{
+
+    return await PrintUsb.printBytes(bytes: bytes, device: UsbDevice(name: device.name??"", model: device.address??"",isDefault: false, available: true));
+  }
+
   // Print data to a BLE device
-  Future<void> printData(
+  Future<bool> printData(
     Printer device,
     List<int> bytes, {
     bool longData = false,
@@ -66,7 +78,7 @@ class WindowPrinterManager {
         final printer = RawPrinter(device.name!, alloc);
         printer.printEscPosWin32(bytes);
       });
-      return;
+      return true;
     }
     if (!isInitialized) {
       throw Exception('WindowBluetoothManager is not initialized');
@@ -79,38 +91,43 @@ class WindowPrinterManager {
     );
     final characteristic = characteristics.firstWhere((element) => element.properties.write ?? false).uuid;
     final mtusize = await WinBle.getMaxMtuSize(device.address!);
-    if (longData) {
-      int mtu = mtusize - 50;
-      if (mtu.isNegative) {
-        mtu = 20;
-      }
-      final numberOfTimes = bytes.length / mtu;
-      final numberOfTimesInt = numberOfTimes.toInt();
-      int timestoPrint = 0;
-      if (numberOfTimes > numberOfTimesInt) {
-        timestoPrint = numberOfTimesInt + 1;
-      } else {
-        timestoPrint = numberOfTimesInt;
-      }
-      for (var i = 0; i < timestoPrint; i++) {
-        final data = bytes.sublist(i * mtu, ((i + 1) * mtu) > bytes.length ? bytes.length : ((i + 1) * mtu));
-        await WinBle.write(
-          address: device.address!,
-          service: service,
-          characteristic: characteristic,
-          data: Uint8List.fromList(data),
-          writeWithResponse: false,
-        );
-      }
-    } else {
-      await WinBle.write(
-        address: device.address!,
-        service: service,
-        characteristic: characteristic,
-        data: Uint8List.fromList(bytes),
-        writeWithResponse: false,
-      );
-    }
+   try{
+     if (longData) {
+       int mtu = mtusize - 50;
+       if (mtu.isNegative) {
+         mtu = 20;
+       }
+       final numberOfTimes = bytes.length / mtu;
+       final numberOfTimesInt = numberOfTimes.toInt();
+       int timestoPrint = 0;
+       if (numberOfTimes > numberOfTimesInt) {
+         timestoPrint = numberOfTimesInt + 1;
+       } else {
+         timestoPrint = numberOfTimesInt;
+       }
+       for (var i = 0; i < timestoPrint; i++) {
+         final data = bytes.sublist(i * mtu, ((i + 1) * mtu) > bytes.length ? bytes.length : ((i + 1) * mtu));
+         await WinBle.write(
+           address: device.address!,
+           service: service,
+           characteristic: characteristic,
+           data: Uint8List.fromList(data),
+           writeWithResponse: false,
+         );
+       }
+     } else {
+       await WinBle.write(
+         address: device.address!,
+         service: service,
+         characteristic: characteristic,
+         data: Uint8List.fromList(bytes),
+         writeWithResponse: false,
+       );
+     }
+     return true;
+   }catch(e){
+     return false;
+   }
   }
 
   StreamSubscription? _usbSubscription;

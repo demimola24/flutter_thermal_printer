@@ -52,12 +52,18 @@ class FlutterThermalPrinter {
     }
   }
 
-  Future<void> printData(
+  Future<bool> printData(
     Printer device,
     List<int> bytes, {
-    bool longData = false,
+    bool longData = true,bool useAlternate = false,
   }) async {
     if (Platform.isWindows) {
+      if(useAlternate){
+        return await WindowPrinterManager.instance.printUSBData(
+          device,
+          bytes
+        );
+      }
       return await WindowPrinterManager.instance.printData(
         device,
         bytes,
